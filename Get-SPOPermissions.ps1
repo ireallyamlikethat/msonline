@@ -24,9 +24,13 @@
   Purpose/Change: Initial script development
 
 .EXAMPLE
-  <Example explanation goes here>
+    See if this works
   
-  <Example goes here. Repeat this attribute for more than one example>
+    get-spopermissions -siteurl https://yourtenant.sharepoint.com/sites/tryone -reportfile c:\folder\sitething.csv
+
+    with all the data - choose any or all of the last switches
+  
+    get-spopermissions -siteurl https://yourtenant.sharepoint.com/sites/tryone -reportfile c:\folder\sitething.csv -recursive -scanitemlevel -IncludeInheritedPermissions
 #>
 
 #---------------------------------------------------------[Script Parameters]------------------------------------------------------
