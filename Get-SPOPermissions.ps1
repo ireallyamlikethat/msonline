@@ -37,11 +37,8 @@ build a list of ALL sites in a tenant, pull permissions set on each, then get a 
 .EXAMPLE
     See if this works
   
-    .\Get-SPOPermissions.ps1 -tenanturl https://learnshrpt.sharepoint.com/sites/siteowner -path c:\temp -recursive
-
-    with all the data - choose any or all of the last switches
-  
-    get-spopermissions -siteurl https://yourtenant.sharepoint.com/sites/tryone -reportfile c:\folder\sitething.csv -recursive -scanitemlevel -IncludeInheritedPermissions
+    .\Get-SPOPermissions.ps1 -tenanturl https://learnshrpt.sharepoint.com/ -path c:\temp
+    
 #>
 
 #---------------------------------------------------------[Script Parameters]------------------------------------------------------
