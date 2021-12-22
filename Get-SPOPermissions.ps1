@@ -329,7 +329,7 @@ Param
 )  
     Try {
         #Connect to the Site
-        Connect-PnPOnline -URL $SiteURL -Interactive
+        Connect-PnPOnline -URL $SiteURL
        
         #Get the Web
         $Web = Get-PnPWeb
