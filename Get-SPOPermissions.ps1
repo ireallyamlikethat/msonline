@@ -1,4 +1,4 @@
-#requires -version 4 -modules SharePointPnPPowerShellOnline
+#requires -version 4 -modules SharePointPnPPowerShellOnline,ImportExcel 
 
 <#
 .SYNOPSIS
@@ -118,7 +118,7 @@ Function Get-PnPPermissions([Microsoft.SharePoint.Client.SecurableObject]$Object
         $PermissionType = $RoleAssignment.Member.PrincipalType
     
         #Get the Permission Levels assigned
-        $PermissionLevels = $RoleAssignment.RoleDefinitionBindings | Select -ExpandProperty Name
+        $PermissionLevels = $RoleAssignment.RoleDefinitionBindings | select-object -ExpandProperty Name
  
         #Remove Limited Access
         $PermissionLevels = ($PermissionLevels | Where { $_ -ne "Limited Access"}) -join ","
@@ -134,7 +134,7 @@ Function Get-PnPPermissions([Microsoft.SharePoint.Client.SecurableObject]$Object
                  
             #Leave Empty Groups
             If($GroupMembers.count -eq 0){Continue}
-            $GroupUsers = ($GroupMembers | Select -ExpandProperty Title) -join ","
+            $GroupUsers = ($GroupMembers | select-object -expandProperty Title) -join ","
  
             #Add the Data to Object
             $Permissions = New-Object PSObject
@@ -163,8 +163,8 @@ Function Get-PnPPermissions([Microsoft.SharePoint.Client.SecurableObject]$Object
             $PermissionCollection += $Permissions
         }
     }
-    #Export Permissions to CSV File
-    $PermissionCollection | Export-CSV $ReportFile -NoTypeInformation -Append
+    #Output PermissionCollection
+    $PermissionCollection
 }#END Get-PnPPermissions
    
 #Function to get sharepoint online site permissions report
@@ -175,7 +175,6 @@ Function Generate-PnPSitePermissionRpt()
     Param 
     (    
         [Parameter(Mandatory=$false)] [String] $SiteURL, 
-        [Parameter(Mandatory=$false)] [String] $ReportFile,         
         [Parameter(Mandatory=$false)] [switch] $Recursive,
         [Parameter(Mandatory=$false)] [switch] $ScanItemLevel,
         [Parameter(Mandatory=$false)] [switch] $IncludeInheritedPermissions       
@@ -183,6 +182,7 @@ Function Generate-PnPSitePermissionRpt()
     Try {
         #import module
         import-module SharePointPnPPowerShellOnline
+        import-module ImportExcel
         
         #Get the Web
         $Web = Get-PnPWeb
@@ -191,7 +191,7 @@ Function Generate-PnPSitePermissionRpt()
         #Get Site Collection Administrators
         $SiteAdmins = Get-PnPSiteCollectionAdmin
          
-        $SiteCollectionAdmins = ($SiteAdmins | Select -ExpandProperty Title) -join ","
+        $SiteCollectionAdmins = ($SiteAdmins | select-object -expandProperty Title) -join ","
         #Add the Data to Object
         $Permissions = New-Object PSObject
         $Permissions | Add-Member NoteProperty Object("Site Collection")
@@ -202,9 +202,9 @@ Function Generate-PnPSitePermissionRpt()
         $Permissions | Add-Member NoteProperty Type("Site Collection Administrators")
         $Permissions | Add-Member NoteProperty Permissions("Site Owner")
         $Permissions | Add-Member NoteProperty GrantedThrough("Direct Permissions")
-               
-        #Export Permissions to CSV File
-        $Permissions | Export-CSV $ReportFile -NoTypeInformation
+           
+        #output Permissions
+        $Permissions
    
         #Function to Get Permissions of All List Items of a given List
         Function Get-PnPListItemsPermission([Microsoft.SharePoint.Client.List]$List)
@@ -348,23 +348,18 @@ Function Generate-PnPSitePermissionRpt()
 
 #-----------------------------------------------------------[Execution]------------------------------------------------------------
 Try {
-    
-
-    #Call the function to generate permission report
-    #New-PnPSitePermissionRpt -SiteURL $SiteURL -ReportFile $ReportFile
-    #New-PnPSitePermissionRpt -SiteURL $SiteURL -ReportFile $ReportFile -Recursive -ScanItemLevel -IncludeInheritedPermissions
-    
     #Connect to Admin Center
     $Cred = Get-Credential -message "Enter credentials for $TenantURL"
-    $pnpConn = Connect-PnPOnline -Url $TenantURL -Credentials $Cred
+    Connect-PnPOnline -Url $TenantURL -Credentials $Cred
+    $tenantFile = "$($TenantURL.Replace('https://','').Replace('/','')).xlsx"
 
     #Get All Site collections - Exclude: Seach Center, Mysite Host, App Catalog, Content Type Hub, eDiscovery and Bot Sites
     $SitesCollections = Get-PnPTenantSite | 
-        Where -Property Template -NotIn ("SRCHCEN#0", "SPSMSITEHOST#0", "APPCATALOG#0", "POINTPUBLISHINGHUB#0", "EDISC#0", "STS#-1") |
+        Where-object -Property Template -NotIn ("SRCHCEN#0", "SPSMSITEHOST#0", "APPCATALOG#0", "POINTPUBLISHINGHUB#0", "EDISC#0", "STS#-1") |
         sort-object url
     
     #Loop through each site collection    
-    write-verbose "connected to tenant - $(get-pnpconnection |Select -expand url)"
+    write-verbose "connected to tenant - $(get-pnpconnection | select-object -expandproperty url)"
     
     ForEach($Site in $SitesCollections )
     {
@@ -372,20 +367,21 @@ Try {
         
         #Connect to site collection        
         $SiteConn = Connect-PnPOnline -Url $Site.Url -Credentials $cred
-        write-verbose "connected to site - $(get-pnpconnection |Select -expand url)"
+        write-verbose "connected to site - $(get-pnpconnection | select-object -expandproperty url)"
     
         #Call the Function for site collection        
-        $ReportName = "$($Site.URL.Replace('https://','').Replace('/','_')).CSV"
-        $ReportFile = join-path $path $ReportName
+        $ReportName = $site.url.replace("$tenanturl","").replace('/','_')
+        $ReportFile = join-path $path $tenantFile
         $npSpParams = @{
-            ReportFile = $ReportFile
             SiteUrl = $site.url
             Recursive = $true
             ScanItemLevel = $false
             IncludeInheritedPermissions = $false
         }
 
-        Generate-PnPSitePermissionRpt @npSpParams
+        $curSiteData = Generate-PnPSitePermissionRpt @npSpParams
+        write-verbose "Save file $reportfile with worksheet $reportname"
+        $curSiteData |export-excel -path $ReportFile -WorksheetName $ReportName -FreezeTopRow -BoldTopRow -AutoSize
     
         Disconnect-PnPOnline -Connection $SiteConn
     }
