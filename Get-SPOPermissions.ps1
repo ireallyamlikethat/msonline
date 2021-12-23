@@ -3,22 +3,15 @@
 <#
 .SYNOPSIS
   SOURCE - https://www.sharepointdiary.com/2019/09/sharepoint-online-user-permissions-audit-report-using-pnp-powershell.html
-  Trimmed down
+  Trimmed down, modified, wrapped up to export to multiple worksheets in one spreadsheet
 
 .DESCRIPTION
 
-yeah no worries. I can read it well enough to see that the individual parts are in there, 
-its just going to be a matter of parsing out what we need. We don't have to get it done today, 
-I just want to be able to tell them on the call we can script it instead of them buying the $1000/year tool
-
-well some of that gets down to item level stuff which we don't need
-basically I need to see each site, 
+USes to see each site, 
     the groups for that site, 
     each list or library in the site 
         and each group and permission level for those lists and libraries 
     exclude file/folder level detail
-
-build a list of ALL sites in a tenant, pull permissions set on each, then get a listing of the lists and libraries for each and pull the permissions for each, put all that in the csv
 
 .PARAMETER <Parameter_Name>
   <Brief description of parameter input required. Repeat this attribute if required>
@@ -54,9 +47,13 @@ Param (
     $Path = "C:\Temp\"
 )
 
+#Set Error Action
+$ErrorActionPreference = 'Continue'
+
 #Function to Get Permissions Applied on a particular Object, such as: Web, List, Folder or List Item
 Function Get-PnPPermissions([Microsoft.SharePoint.Client.SecurableObject]$Object)
 {
+    write-verbose "-- Run Get-PnPPermissions against $($Object |out-string)"
     #Determine the type of the object
     Switch($Object.TypedObject.ToString())
     {
@@ -75,7 +72,7 @@ Function Get-PnPPermissions([Microsoft.SharePoint.Client.SecurableObject]$Object
             {
                 #Get the URL of the Object
                 Get-PnPProperty -ClientObject $Object -Property File, ParentList
-                If($Object.File.Name -ne $Null)
+                If($Null -ne $Object.File.Name)
                 {
                     $ObjectType = "File"
                     $ObjectTitle = $Object.File.Name
@@ -121,7 +118,7 @@ Function Get-PnPPermissions([Microsoft.SharePoint.Client.SecurableObject]$Object
         $PermissionLevels = $RoleAssignment.RoleDefinitionBindings | select-object -ExpandProperty Name
  
         #Remove Limited Access
-        $PermissionLevels = ($PermissionLevels | Where { $_ -ne "Limited Access"}) -join ","
+        $PermissionLevels = ($PermissionLevels | Where-object { $_ -ne "Limited Access"}) -join ","
  
         #Leave Principals with no Permissions
         If($PermissionLevels.Length -eq 0) {Continue}
@@ -165,25 +162,21 @@ Function Get-PnPPermissions([Microsoft.SharePoint.Client.SecurableObject]$Object
     }
     #Output PermissionCollection
     $PermissionCollection
+
 }#END Get-PnPPermissions
    
-#Function to get sharepoint online site permissions report
-Function Generate-PnPSitePermissionRpt()
+#MAIN Function to get sharepoint online site permissions report
+Function New-PnPSitePermissionRpt()
 {
 [cmdletbinding()]
- 
-    Param 
-    (    
-        [Parameter(Mandatory=$false)] [String] $SiteURL, 
-        [Parameter(Mandatory=$false)] [switch] $Recursive,
-        [Parameter(Mandatory=$false)] [switch] $ScanItemLevel,
-        [Parameter(Mandatory=$false)] [switch] $IncludeInheritedPermissions       
-    )  
+Param 
+(    
+    [Parameter(Mandatory=$false)] [String] $SiteURL, 
+    [Parameter(Mandatory=$false)] [switch] $Recursive,
+    [Parameter(Mandatory=$false)] [switch] $ScanItemLevel,
+    [Parameter(Mandatory=$false)] [switch] $IncludeInheritedPermissions       
+)  
     Try {
-        #import module
-        import-module SharePointPnPPowerShellOnline
-        import-module ImportExcel
-        
         #Get the Web
         $Web = Get-PnPWeb
  
@@ -209,7 +202,7 @@ Function Generate-PnPSitePermissionRpt()
         #Function to Get Permissions of All List Items of a given List
         Function Get-PnPListItemsPermission([Microsoft.SharePoint.Client.List]$List)
         {
-            write-verbose "-- Run Get-PnPListItemsPermission against $list"
+            write-verbose "-- Run Get-PnPListItemsPermission against $($List.Title)"
 
             write-verbose "`t `t Getting Permissions of List Items in the List: $($List.Title)"
   
@@ -245,7 +238,7 @@ Function Generate-PnPSitePermissionRpt()
         #Function to Get Permissions of all lists from the given web
         Function Get-PnPListPermission([Microsoft.SharePoint.Client.Web]$Web)
         {
-            write-verbose "-- Run Get-PnPListPermission against $web"
+            write-verbose "-- Run Get-PnPListPermission against $($Web.URL)"
             #Get All Lists from the web
             $Lists = Get-PnPProperty -ClientObject $Web -Property Lists
             write-verbose "-- found $($lists.count) lists"
@@ -295,7 +288,7 @@ Function Generate-PnPSitePermissionRpt()
         #Function to Get Webs's Permissions from given URL
         Function Get-PnPWebPermission([Microsoft.SharePoint.Client.Web]$Web) 
         {
-            write-verbose "-- Run Get-PnPWebPermission against $web"
+            write-verbose "-- Run Get-PnPWebPermission against $($Web.URL)"
 
             #Call the function to Get permissions of the web
             write-verbose "Getting Permissions of the Web: $($Web.URL)..." 
@@ -342,12 +335,17 @@ Function Generate-PnPSitePermissionRpt()
         write-verbose "`n*** Site Permission Report Generated Successfully!***"
      }
     Catch {
-        write-verbose "Error Generating Site Permission Report!" $_.Exception.Message
+        write-error "Error Generating Site Permission Report!"
+        Write-Error $_.Exception    
    }
-}#END Generate-PnPSitePermissionRpt
+}#END New-PnPSitePermissionRpt
 
 #-----------------------------------------------------------[Execution]------------------------------------------------------------
 Try {
+    #import module
+    import-module SharePointPnPPowerShellOnline
+    import-module ImportExcel
+
     #Connect to Admin Center
     $Cred = Get-Credential -message "Enter credentials for $TenantURL"
     Connect-PnPOnline -Url $TenantURL -Credentials $Cred
@@ -363,23 +361,27 @@ Try {
     
     ForEach($Site in $SitesCollections )
     {
-        write-verbose "Generating Report for Site: $Site.Url"        
-        
-        #Connect to site collection        
-        $SiteConn = Connect-PnPOnline -Url $Site.Url -Credentials $cred
-        write-verbose "connected to site - $(get-pnpconnection | select-object -expandproperty url)"
-    
-        #Call the Function for site collection        
+        write-verbose "Generating Report for Site: $($Site.Url)" -verbose     
         $ReportName = $site.url.replace("$tenanturl","").replace('/','_')
         $ReportFile = join-path $path $tenantFile
+        
+        #Connect to site collection
+        try { $SiteConn = Connect-PnPOnline -Url $Site.Url -Credentials $cred -ErrorAction SilentlyContinue }        
+        Catch { 
+            "no access to $($site.url)" |export-excel -path $ReportFile -WorksheetName $ReportName -FreezeTopRow -BoldTopRow -AutoSize
+            continue 
+        }
+        write-verbose "connected to site - $(get-pnpconnection | select-object -expandproperty url)"
+    
+        #Call the Function for site collection 
         $npSpParams = @{
             SiteUrl = $site.url
             Recursive = $true
             ScanItemLevel = $false
-            IncludeInheritedPermissions = $false
+            IncludeInheritedPermissions = $true
         }
 
-        $curSiteData = Generate-PnPSitePermissionRpt @npSpParams
+        $curSiteData = New-PnPSitePermissionRpt @npSpParams -verbose
         write-verbose "Save file $reportfile with worksheet $reportname"
         $curSiteData |export-excel -path $ReportFile -WorksheetName $ReportName -FreezeTopRow -BoldTopRow -AutoSize
     
@@ -387,5 +389,6 @@ Try {
     }
 }
 Catch {
-    Write-Error $_.Exception    
+    Write-Error $_.Exception
+    continue
 }
