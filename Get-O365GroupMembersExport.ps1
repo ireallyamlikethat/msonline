@@ -38,7 +38,7 @@ Param (
         Mandatory = $true,
         Position = 0
     )]
-    $TenantURL = ,
+    $TenantURL,
     [Parameter(Mandatory = $true)]
     $Path = "C:\Temp\",
     [Parameter(Mandatory = $true)]
