@@ -6,28 +6,38 @@
   Trimmed down, modified, wrapped up to export to multiple worksheets in one spreadsheet
 
 .DESCRIPTION
+  Get all groups from a tenant and list each members of the group on separate worksheets. 
 
-Get all groups from a tenant and list each members of the group on separate worksheets. 
+.PARAMETER TenantURL
+  URL of an M365 tenant, eg:   learnshrpt.sharepoint.com
 
-.PARAMETER <Parameter_Name>
-  <Brief description of parameter input required. Repeat this attribute if required>
+.PARAMETER Path
+  Folder where files will be exported. 
+
+.PARAMETER combine
+  Using this switch provides a MasterList worksheet for all user and group data
 
 .INPUTS
   <Inputs if any, otherwise state None>
 
 .OUTPUTS
-  <Outputs if any, otherwise state None>
+  Excel spreadsheets with group and user information
 
 .NOTES
-  Version:        1.0
-  Author:         <Name>
+  Version:        1.2
+  Author:         Dave Nicholls
   Creation Date:  <Date>
-  Purpose/Change: Initial script development
+  Purpose/Change: Add Combine switch, clean up notes, update for MFA use. 
 
 .EXAMPLE
-    See if this works
+    Export data to separate worksheets
   
     .\Get-O365GroupMembersExport.ps1 -tenanturl https://learnshrpt.sharepoint.com/ -path c:\temp
+    
+.EXAMPLE
+  Export data to separate worksheets, including a MasterList worksheet
+
+  .\Get-O365GroupMembersExport.ps1 -tenanturl learnshrpt.sharepoint.com -path c:\temp -combine
     
 #>
 
@@ -40,9 +50,8 @@ Param (
     )]
     $TenantURL,
     [Parameter(Mandatory = $true)]
-    $Path = "C:\Temp\",
-    [Parameter(Mandatory = $true)]
-    [pscredential]$Credential = (Get-Credential)
+    $Path,
+    [switch]$combine
 )
 
 #Set Error Action
@@ -53,8 +62,8 @@ import-module ExchangeOnlineManagement
 import-module ImportExcel
 
 #Connect to Exchange Online
-Connect-ExchangeOnline -Credential $Credential -ShowBanner:$False
-$tenantFile = "$($TenantURL.Replace('https://','').Replace('/',''))-groups.xlsx"
+Connect-ExchangeOnline -ShowBanner:$False
+$tenantFile = "$($TenantURL.Replace('https://','').Replace('/',''))-groups-$(get-date -format MMddyyyy).xlsx"
 $ReportFile = join-path $path $tenantFile
 
 write-verbose "Save Report to - $reportfile" -verbose
@@ -62,7 +71,7 @@ write-verbose "Save Report to - $reportfile" -verbose
 #Get all Office 365 Group
 $curTennant = ($credential.username -replace "\w+@")
 write-verbose "Get all groups for $curTennant " -verbose
-$uGroups = Get-UnifiedGroup
+$uGroups = Get-UnifiedGroup |sort-object Alias
 write-verbose "- Found $($ugroups.count) groups"
 
 
@@ -75,16 +84,22 @@ foreach ($group in $ugroups){
         foreach ($user in $curUsers){
             $curobject = [PSCustomObject]@{
                 GroupName = $group.Displayname
-                #GroupAlias = $group.Alias
-                #GroupType = $group.GroupType
+                State = "MEMBER"
                 UserName = $user.Name
                 UserDisplayName = $user.Displayname
-                #UserTitle = $user.title 
+            }
+            if ($user.name -in $group.managedby){
+              $curobject.State  = "OWNER"
             }
             $curobject
         }
     )
-    $curData |export-excel -path $ReportFile -WorksheetName $group.Alias -FreezeTopRow -BoldTopRow -AutoSize
+    if ($combine.ispresent){
+      $curData | sort-object UserName | 
+        export-excel -path $ReportFile -WorksheetName MasterList -FreezeTopRow -BoldTopRow -AutoSize -Append
+    }
+    $curData | sort-object UserName| 
+      export-excel -path $ReportFile -WorksheetName $group.Alias -FreezeTopRow -BoldTopRow -AutoSize
 }
 
 write-verbose "REPORTING COMPLETE - DISCONNECTING"
