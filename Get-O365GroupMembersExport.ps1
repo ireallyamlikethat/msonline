@@ -35,7 +35,7 @@
     .\Get-O365GroupMembersExport.ps1 -tenanturl https://learnshrpt.sharepoint.com/ -path c:\temp
     
 .EXAMPLE
-  Export data to separate worksheets, including a MasterList worksheet
+  Export data to only a MasterList worksheet
 
   .\Get-O365GroupMembersExport.ps1 -tenanturl learnshrpt.sharepoint.com -path c:\temp -combine
     
@@ -51,7 +51,7 @@ Param (
     $TenantURL,
     [Parameter(Mandatory = $true)]
     $Path,
-    [switch]$combine
+    [switch]$master
 )
 
 #Set Error Action
@@ -63,13 +63,14 @@ import-module ImportExcel
 
 #Connect to Exchange Online
 Connect-ExchangeOnline -ShowBanner:$False
-$tenantFile = "$($TenantURL.Replace('https://','').Replace('/',''))-groups-$(get-date -format MMddyyyy).xlsx"
+$tenantBasic = $($TenantURL.Replace('https://','').Replace('/',''))
+$tenantFile = "$tenantBasic-groups-$(get-date -format MMddyyyy).xlsx"
 $ReportFile = join-path $path $tenantFile
 
 write-verbose "Save Report to - $reportfile" -verbose
 
 #Get all Office 365 Group
-$curTennant = ($credential.username -replace "\w+@")
+$curTennant = $TenantURL
 write-verbose "Get all groups for $curTennant " -verbose
 $uGroups = Get-UnifiedGroup |sort-object Alias
 write-verbose "- Found $($ugroups.count) groups"
@@ -79,8 +80,22 @@ foreach ($group in $ugroups){
   write-verbose "Check users in - $($group.displayname)" -verbose
     $curUsers = $group | Get-UnifiedGroupLinks -LinkType Member
     write-verbose "- Found $($curUsers.count) users" -verbose
-
+ 
     $curData = @(
+       #if an owner is not a member include it anyway
+       foreach ($owner in $group.ManagedBy|sort-object ){
+          
+            $curobject = [PSCustomObject]@{
+              GroupName = $group.Displayname
+              State = "OWNER"
+              UserName = $owner
+              UserDisplayName = (get-user $owner ).displayname
+            }
+               
+            $curobject
+        }
+        
+        #process group members
         foreach ($user in $curUsers){
             $curobject = [PSCustomObject]@{
                 GroupName = $group.Displayname
@@ -94,12 +109,19 @@ foreach ($group in $ugroups){
             $curobject
         }
     )
-    if ($combine.ispresent){
+    if ($master.ispresent){
+        #export to masterlist only        
+        write-verbose -verbose "Write to MasterList only"
+        
       $curData | sort-object UserName | 
         export-excel -path $ReportFile -WorksheetName MasterList -FreezeTopRow -BoldTopRow -AutoSize -Append
-    }
-    $curData | sort-object UserName| 
+    }else {
+      #export to multiple pages
+      write-verbose -verbose "Write to multiple pages"
+      $curData | sort-object UserName| 
       export-excel -path $ReportFile -WorksheetName $group.Alias -FreezeTopRow -BoldTopRow -AutoSize
+    }
+    
 }
 
 write-verbose "REPORTING COMPLETE - DISCONNECTING"
