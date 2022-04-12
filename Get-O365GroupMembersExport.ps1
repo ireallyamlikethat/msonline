@@ -14,8 +14,8 @@
 .PARAMETER Path
   Folder where files will be exported. 
 
-.PARAMETER combine
-  Using this switch provides a MasterList worksheet for all user and group data
+.PARAMETER Master
+  Using this switch provides only a MasterList worksheet for all user and group data
 
 .INPUTS
   <Inputs if any, otherwise state None>
@@ -37,7 +37,7 @@
 .EXAMPLE
   Export data to only a MasterList worksheet
 
-  .\Get-O365GroupMembersExport.ps1 -tenanturl learnshrpt.sharepoint.com -path c:\temp -combine
+  .\Get-O365GroupMembersExport.ps1 -tenanturl learnshrpt.sharepoint.com -path c:\temp -Master
     
 #>
 
@@ -51,7 +51,7 @@ Param (
     $TenantURL,
     [Parameter(Mandatory = $true)]
     $Path,
-    [switch]$master
+    [switch]$Master
 )
 
 #Set Error Action
