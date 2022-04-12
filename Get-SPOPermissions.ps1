@@ -4,6 +4,7 @@
 .SYNOPSIS
   SOURCE - https://www.sharepointdiary.com/2019/09/sharepoint-online-user-permissions-audit-report-using-pnp-powershell.html
   Trimmed down, modified, wrapped up to export to multiple worksheets in one spreadsheet
+  Note - this calls get-pnppermissions.ps1 which is required for detail information on sites. 
 
 .DESCRIPTION
 
@@ -29,15 +30,20 @@ USes to see each site,
   <Outputs if any, otherwise state None>
 
 .NOTES
-  Version:        1.0
-  Author:         <Name>
+  Version:        1.2
+  Author:         Dave Nicholls
   Creation Date:  <Date>
-  Purpose/Change: Initial script development
+  Purpose/Change: Add master switch, clean up notes, update for MFA use. 
 
 .EXAMPLE
-    See if this works
-  
-    .\Get-SPOPermissions.ps1 -tenanturl https://learnshrpt.sharepoint.com/ -path c:\temp
+    Export data to separate worksheets
+
+    .\Get-SPOPermissions.ps1 -TenantURL https://learnshrpt.sharepoint.com/ -Path c:\temp
+     
+.EXAMPLE
+    Export data to only a MasterList worksheet
+
+    .\Get-SPOPermissions.ps1 -TenantURL https://learnshrpt.sharepoint.com/ -Path c:\temp -Master
     
 #>
 
@@ -366,12 +372,9 @@ Try {
     #Loop through each site collection    
     write-verbose "connected to tenant - $(get-pnpconnection | select-object -expandproperty url)"
     
-    $count = 0
-
     ForEach($Site in $SitesCollections )
     {
-        $count++
-        if ($count -gt 10) {exit}
+       
         #$ReportName = $site.url.replace("$tenanturl","").replace('/','_')
         #$ReportFile = join-path $path $tenantFile
 
