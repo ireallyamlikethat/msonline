@@ -1,4 +1,4 @@
-#requires -version 4 -modules microsoft.graph,ImportExcel 
+#requires -version 7 -modules microsoft.graph,ImportExcel 
 
 <#
 .SYNOPSIS
