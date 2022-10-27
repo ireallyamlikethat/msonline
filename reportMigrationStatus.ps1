@@ -18,7 +18,7 @@ Connect-ExchangeOnline
 import-module ExchangeOnlineManagement
 import-module ImportExcel
 
-$tenantFile = "$domain-MigrationStatistics-$(get-date -format MMddyyyy-hhmm).xlsx"
+$tenantFile = "MigrationStatistics-$(get-date -format MMddyyyy-hhmm).xlsx"
 $ReportFile = join-path $path $tenantFile
 
 Connect-ExchangeOnline
