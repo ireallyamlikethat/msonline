@@ -7,7 +7,7 @@ $users = Get-MigrationUser -ResultSize Unlimited -BatchId "MigrationBatch01"
 Param
 (
     [Parameter(Mandatory = $true)]
-    [string[]]$username,
+    [string[]]$BatchId,
     [Parameter(Mandatory = $true)]
     $Path
 )
@@ -24,12 +24,16 @@ $ReportFile = join-path $path $tenantFile
 Connect-ExchangeOnline
 
 $curData = @(
-    foreach ($user in $username){
-        write-verbose "Process $($user.identity)"
-        $userStats = Get-MigrationUserStatistics -Identity $user.identity -IncludeSkippedItems -IncludeReport | 
-            select-object Identity , IsValid, Subject, Sender, Recipient, Kind, DateSent,  DateReceived, FolderName, MessageSize, ScoringClassifications
+    foreach ($batch in $BatchId){
+        write-verbose -verbose "Process Batch: $batch"
+        $users = Get-MigrationUser -ResultSize Unlimited -BatchId $batch
+        foreach ($user in $users){
+            write-verbose "Process $($user.identity)"
+            $userStats = Get-MigrationUserStatistics -Identity $user.identity -IncludeSkippedItems -IncludeReport | 
+                select-object Identity , IsValid, Subject, Sender, Recipient, Kind, DateSent,  DateReceived, FolderName, MessageSize, ScoringClassifications
 
         $userStats
+        }        
     }
 )
 
