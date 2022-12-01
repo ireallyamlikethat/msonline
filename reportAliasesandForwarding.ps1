@@ -34,8 +34,8 @@ write-verbose -verbose "Found $($allmailboxes.count) mailboxes to report on"
 
 $curData = @(
     $allMailboxes | select-object Identity,displayname,PrimarySmtpAddress,
-            @{"L"="ForwardingSmtpAddress";"E"={ ($_.ForwardingSmtpAddress -match "smtp")  -replace "smtp:"} },
-            @{"L"="EmailAddressSummary";"E"={ (($_.EmailAddresses -match "smtp") -join ",") -replace "smtp:"} }
+    @{"L"="ForwardingSmtpAddress";"E"={ $_.ForwardingSmtpAddress  -replace "smtp:"} },
+    @{"L"="EmailAddressSummary";"E"={ (($_.EmailAddresses -match "smtp") -join ",") -replace "smtp:"} }
 )
 
 write-verbose -verbose "Export validation file - $reportfile"
